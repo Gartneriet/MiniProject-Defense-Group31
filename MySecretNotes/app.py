@@ -1,7 +1,8 @@
 import json, sqlite3, click, functools, os, hashlib,time, random, sys
-from flask import Flask, current_app, g, session, redirect, render_template, url_for, request
+from flask import Flask, current_app, g, session, redirect, render_template, url_for, request, flash
 from werkzeug.security import check_password_hash, generate_password_hash
-
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 ### DATABASE FUNCTIONS ###
@@ -10,8 +11,8 @@ def connect_db():
     return sqlite3.connect(app.database)
 
 def init_db():
-    hash1 = generate_password_hash("password")
-    hash2 = generate_password_hash("omgMPC")
+    hash1 = generate_password_hash("password1")
+    hash2 = generate_password_hash("omgMPC1")
     """Initializes the database with our great SQL schema"""
     conn = connect_db()
     db = conn.cursor()
@@ -30,7 +31,7 @@ CREATE TABLE notes (
 
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
+    username TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL
 );
 
@@ -47,6 +48,13 @@ INSERT INTO notes VALUES(null,2,"1993-09-23 12:10:10","i want lunch pls",1234567
 app = Flask(__name__)
 app.database = "db.sqlite3"
 app.secret_key = os.urandom(32)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 
 ### ADMINISTRATOR'S PANEL ###
 def login_required(view):
@@ -108,6 +116,7 @@ def notes():
 
 
 @app.route("/login/", methods=('GET', 'POST'))
+@limiter.limit("5 per minute", error_message = "Too many login attempts. Please try again in a minute.")
 def login():
     error = ""
     if request.method == 'POST':
@@ -140,18 +149,12 @@ def register():
     passworderror = ""
     if request.method == 'POST':
         
-
         username = request.form['username']
         password = request.form['password']
         hashed_password = generate_password_hash(password)
         db = connect_db()
         c = db.cursor()
-        pass_statement = """SELECT * FROM users WHERE password = ?;"""
         user_statement = """SELECT * FROM users WHERE username = ?;"""
-        c.execute(pass_statement, (hashed_password,))
-        if(len(c.fetchall())>0):
-            errored = True
-            passworderror = "That password is already in use by someone else!"
 
         c.execute(user_statement, (username,))
         if(len(c.fetchall())>0):

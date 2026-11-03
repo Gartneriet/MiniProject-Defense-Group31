@@ -77,16 +77,24 @@ def index():
 @login_required
 def notes():
     importerror=""
+    noteerror=""
     #Posting a new note:
     if request.method == 'POST':
         if request.form['submit_button'] == 'add note':
             note = request.form['noteinput']
-            db = connect_db()
-            c = db.cursor()
-            statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
-            c.execute(statement, (session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999)))
-            db.commit()
-            db.close()
+
+            if not note.strip(): #rejects empty notes
+                noteerror = "Note cannot be empty!"
+            elif len(note) > 300: #reject long notes
+                noteerror = "Note cannot be more than 300 characters!"
+            else: #save valid note
+
+                db = connect_db()
+                c = db.cursor()
+                statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+                c.execute(statement, (session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999)))
+                db.commit()
+                db.close()
         elif request.form['submit_button'] == 'import note':
             noteid = request.form['noteid']
             db = connect_db()
@@ -109,7 +117,7 @@ def notes():
     c.execute(statement, (session['userid'],))
     notes = c.fetchall()
     
-    return render_template('notes.html',notes=notes,importerror=importerror)
+    return render_template('notes.html',notes=notes,importerror=importerror, noteerror=noteerror)
 
 
 @app.route("/login/", methods=('GET', 'POST'))

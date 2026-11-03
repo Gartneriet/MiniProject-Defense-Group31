@@ -1,7 +1,8 @@
 import json, sqlite3, click, functools, os, hashlib,time, random, sys
-from flask import Flask, current_app, g, session, redirect, render_template, url_for, request
-
-
+from flask import Flask, current_app, g, session, redirect, render_template, url_for, request, flash
+from werkzeug.security import check_password_hash, generate_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 ### DATABASE FUNCTIONS ###
@@ -10,10 +11,12 @@ def connect_db():
     return sqlite3.connect(app.database)
 
 def init_db():
+    hash1 = generate_password_hash("password1")
+    hash2 = generate_password_hash("omgMPC1")
     """Initializes the database with our great SQL schema"""
     conn = connect_db()
     db = conn.cursor()
-    db.executescript("""
+    db.executescript(f"""
 
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS notes;
@@ -28,12 +31,12 @@ CREATE TABLE notes (
 
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL,
+    username TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL
 );
 
-INSERT INTO users VALUES(null,"admin", "password");
-INSERT INTO users VALUES(null,"bernardo", "omgMPC");
+INSERT INTO users VALUES(null,"admin", "{hash1}");
+INSERT INTO users VALUES(null,"bernardo", "{hash2}");
 INSERT INTO notes VALUES(null,2,"1993-09-23 10:10:10","hello my friend",1234567890);
 INSERT INTO notes VALUES(null,2,"1993-09-23 12:10:10","i want lunch pls",1234567891);
 
@@ -45,6 +48,13 @@ INSERT INTO notes VALUES(null,2,"1993-09-23 12:10:10","i want lunch pls",1234567
 app = Flask(__name__)
 app.database = "db.sqlite3"
 app.secret_key = os.urandom(32)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 
 ### ADMINISTRATOR'S PANEL ###
 def login_required(view):
@@ -73,21 +83,21 @@ def notes():
             note = request.form['noteinput']
             db = connect_db()
             c = db.cursor()
-            statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,%s,'%s','%s',%s);""" %(session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999))
-            c.execute(statement)
+            statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+            c.execute(statement, (session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999)))
             db.commit()
             db.close()
         elif request.form['submit_button'] == 'import note':
             noteid = request.form['noteid']
             db = connect_db()
             c = db.cursor()
-            statement = """SELECT * from NOTES where publicID = %s""" %noteid
-            c.execute(statement)
+            statement = """SELECT * from NOTES where publicID = ?;"""
+            c.execute(statement, (noteid,))
             result = c.fetchall()
             if(len(result)>0):
                 row = result[0]
-                statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,%s,'%s','%s',%s);""" %(session['userid'],row[2],row[3],row[4])
-                c.execute(statement)
+                statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+                c.execute(statement, (session['userid'],row[2],row[3],row[4]))
             else:
                 importerror="No such note with that ID!"
             db.commit()
@@ -95,14 +105,15 @@ def notes():
     
     db = connect_db()
     c = db.cursor()
-    statement = "SELECT * FROM notes WHERE assocUser = %s;" %session['userid']
-    c.execute(statement)
+    statement = "SELECT * FROM notes WHERE assocUser = ?"
+    c.execute(statement, (session['userid'],))
     notes = c.fetchall()
     
     return render_template('notes.html',notes=notes,importerror=importerror)
 
 
 @app.route("/login/", methods=('GET', 'POST'))
+@limiter.limit("5 per minute", error_message = "Too many login attempts. Please try again in a minute.")
 def login():
     error = ""
     if request.method == 'POST':
@@ -110,16 +121,19 @@ def login():
         password = request.form['password']
         db = connect_db()
         c = db.cursor()
-        statement = "SELECT * FROM users WHERE username = '%s' AND password = '%s';" %(username, password)
-        c.execute(statement)
+        statement = "SELECT * FROM users WHERE username = ?;"
+        c.execute(statement, (username,))
         result = c.fetchall()
 
         if len(result) > 0:
-            session.clear()
-            session['logged_in'] = True
-            session['userid'] = result[0][0]
-            session['username']=result[0][1]
-            return redirect(url_for('index'))
+            hashed_password = result[0][2]
+            is_correct = check_password_hash(hashed_password, password)
+            if is_correct:
+                session.clear()
+                session['logged_in'] = True
+                session['userid'] = result[0][0]
+                session['username']=result[0][1]
+                return redirect(url_for('index'))
         else:
             error = "Wrong username or password!"
     return render_template('login.html',error=error)
@@ -132,26 +146,21 @@ def register():
     passworderror = ""
     if request.method == 'POST':
         
-
         username = request.form['username']
         password = request.form['password']
+        hashed_password = generate_password_hash(password)
         db = connect_db()
         c = db.cursor()
-        pass_statement = """SELECT * FROM users WHERE password = '%s';""" %password
-        user_statement = """SELECT * FROM users WHERE username = '%s';""" %username
-        c.execute(pass_statement)
-        if(len(c.fetchall())>0):
-            errored = True
-            passworderror = "That password is already in use by someone else!"
+        user_statement = """SELECT * FROM users WHERE username = ?;"""
 
-        c.execute(user_statement)
+        c.execute(user_statement, (username,))
         if(len(c.fetchall())>0):
             errored = True
             usererror = "That username is already in use by someone else!"
 
         if(not errored):
-            statement = """INSERT INTO users(id,username,password) VALUES(null,'%s','%s');""" %(username,password)
-            c.execute(statement)
+            statement = """INSERT INTO users(id,username,password) VALUES(null,?,?);"""
+            c.execute(statement, (username, hashed_password))
             db.commit()
             db.close()
             return f"""<html>

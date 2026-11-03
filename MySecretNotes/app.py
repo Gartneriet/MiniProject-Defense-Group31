@@ -74,7 +74,6 @@ def notes():
             db = connect_db()
             c = db.cursor()
             statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,%s,'%s','%s',%s);""" %(session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999))
-            print(statement)
             c.execute(statement)
             db.commit()
             db.close()
@@ -97,10 +96,8 @@ def notes():
     db = connect_db()
     c = db.cursor()
     statement = "SELECT * FROM notes WHERE assocUser = %s;" %session['userid']
-    print(statement)
     c.execute(statement)
     notes = c.fetchall()
-    print(notes)
     
     return render_template('notes.html',notes=notes,importerror=importerror)
 
@@ -154,7 +151,6 @@ def register():
 
         if(not errored):
             statement = """INSERT INTO users(id,username,password) VALUES(null,'%s','%s');""" %(username,password)
-            print(statement)
             c.execute(statement)
             db.commit()
             db.close()

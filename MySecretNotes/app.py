@@ -103,33 +103,26 @@ def notes():
     if request.method == 'POST':
         if request.form['submit_button'] == 'add note':
             note = request.form['noteinput']
-            db = connect_db()
-            c = db.cursor()
-            statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
-            c.execute(statement, (session['userid'],time.strftime('%Y-%m-%d %H:%M:%S'),note,random.randrange(1000000000, 9999999999)))
-            db.commit()
-            db.close()
+            with DatabaseConnection(app) as db:
+                statement = """INSERT INTO notes(assocUser,dateWritten,note,publicID) VALUES(?,?,?,?);"""
+                db.execute(statement, (session['userid'], time.strftime('%Y-%m-%d %H:%M:%S'), note, random.randrange(1000000000, 9999999999)))
         elif request.form['submit_button'] == 'import note':
             noteid = request.form['noteid']
-            db = connect_db()
-            c = db.cursor()
-            statement = """SELECT * from NOTES where publicID = ?;"""
-            c.execute(statement, (noteid,))
-            result = c.fetchall()
-            if(len(result)>0):
-                row = result[0]
-                statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
-                c.execute(statement, (session['userid'],row[2],row[3],row[4]))
-            else:
-                importerror="No such note with that ID!"
-            db.commit()
-            db.close()
-    
-    db = connect_db()
-    c = db.cursor()
-    statement = "SELECT * FROM notes WHERE assocUser = ?"
-    c.execute(statement, (session['userid'],))
-    notes = c.fetchall()
+            with DatabaseConnection(app) as db:
+                statement = """SELECT * from NOTES where publicID = ?;"""
+                db.execute(statement, (noteid,))
+                result = db.fetchall()
+                if(len(result)>0):
+                    row = result[0]
+                    statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+                    db.execute(statement, (session['userid'],row[2],row[3],row[4]))
+                else:
+                    importerror="No such note with that ID!"
+                    
+    with DatabaseConnection(app) as db:
+        statement = "SELECT * FROM notes WHERE assocUser = ?"
+        db.execute(statement, (session['userid'],))
+        notes = db.fetchall()
     
     return render_template('notes.html',notes=notes,importerror=importerror)
 
@@ -141,23 +134,23 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        db = connect_db()
-        c = db.cursor()
-        statement = "SELECT * FROM users WHERE username = ?;"
-        c.execute(statement, (username,))
-        result = c.fetchall()
+        with DatabaseConnection(app) as db:
+            statement = "SELECT * FROM users WHERE username = ?;"
+            db.execute(statement, (username,))
+            result = db.fetchall()
 
-        if len(result) > 0:
-            hashed_password = result[0][2]
-            is_correct = check_password_hash(hashed_password, password)
-            if is_correct:
-                session.clear()
-                session['logged_in'] = True
-                session['userid'] = result[0][0]
-                session['username']=result[0][1]
-                return redirect(url_for('index'))
-        else:
-            error = "Wrong username or password!"
+            if len(result) > 0:
+                hashed_password = result[0][2]
+                is_correct = check_password_hash(hashed_password, password)
+                if is_correct:
+                    session.clear()
+                    session['logged_in'] = True
+                    session['userid'] = result[0][0]
+                    session['username']=result[0][1]
+                    return redirect(url_for('index'))
+            else:
+                error = "Wrong username or password!"
+
     return render_template('login.html',error=error)
 
 
@@ -167,24 +160,20 @@ def register():
     usererror = ""
     passworderror = ""
     if request.method == 'POST':
-        
         username = request.form['username']
         password = request.form['password']
         hashed_password = generate_password_hash(password)
-        db = connect_db()
-        c = db.cursor()
-        user_statement = """SELECT * FROM users WHERE username = ?;"""
 
-        c.execute(user_statement, (username,))
-        if(len(c.fetchall())>0):
-            errored = True
-            usererror = "That username is already in use by someone else!"
-
-        if(not errored):
-            statement = """INSERT INTO users(id,username,password) VALUES(null,?,?);"""
-            c.execute(statement, (username, hashed_password))
-            db.commit()
-            db.close()
+        with DatabaseConnection(app) as db:
+            statement = "SELECT * FROM users WHERE username = ?;"
+            db.execute(statement, (username,))
+            result = db.fetchall()
+            if len(result) > 0:
+                errored = True
+                usererror = "That username is already in use by someone else!"
+            if (not errored):
+                statement = """INSERT INTO users(id,username,password) VALUES(null,?,?);"""
+                db.execute(statement, (username, hashed_password))
             return f"""<html>
                         <head>
                             <meta http-equiv="refresh" content="2;url=/" />
@@ -194,9 +183,7 @@ def register():
                         </body>
                         </html>
                         """
-        
-        db.commit()
-        db.close()
+
     return render_template('register.html',usererror=usererror,passworderror=passworderror)
 
 

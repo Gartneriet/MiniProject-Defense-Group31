@@ -1,4 +1,5 @@
 import json, sqlite3, click, functools, os, hashlib,time, random, sys
+
 from flask import Flask, current_app, g, session, redirect, render_template, url_for, request, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_limiter import Limiter
@@ -7,41 +8,62 @@ from flask_limiter.util import get_remote_address
 
 ### DATABASE FUNCTIONS ###
 
-def connect_db():
-    return sqlite3.connect(app.database)
+# Database connection class taken from https://medium.com/@sidharth08singh.de/context-managers-in-python-0e25367c2a08
+class DatabaseConnection:
+    def __init__(self, app):
+        self.app = app
+        self.conn = None
+        self.cursor = None
+
+    def __enter__(self):
+        """Establish the database connection and return a cursor."""
+        self.conn = sqlite3.connect(self.app.database) # Connect to the database
+        self.cursor = self.conn.cursor()               # Create a cursor for executing SQL queries
+        return self.cursor                             # Return the cursor so the caller can execute queries
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Clean up the connection (commit, close)."""
+        if exc_type:                                   
+            print(f"An error occurred: {exc_value}")   # Handle any exception raised during the context block
+            self.conn.rollback()                       # Rollback if there was an error
+        else:
+            self.conn.commit()                         # Commit the transaction if no error
+
+        self.cursor.close()                            # Close the connection and cursor after execution
+        self.conn.close()
 
 def init_db():
-    hash1 = generate_password_hash("password1")
-    hash2 = generate_password_hash("omgMPC1")
-    """Initializes the database with our great SQL schema"""
-    conn = connect_db()
-    db = conn.cursor()
-    db.executescript(f"""
+    with DatabaseConnection(app) as db:
+        # Create schema
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                assocUser INTEGER NOT NULL,
+                dateWritten DATETIME NOT NULL,
+                note TEXT NOT NULL,
+                publicID INTEGER NOT NULL
+            );
 
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS notes;
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL
+            );
+        """)
 
-CREATE TABLE notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    assocUser INTEGER NOT NULL,
-    dateWritten DATETIME NOT NULL,
-    note TEXT NOT NULL,
-    publicID INTEGER NOT NULL
-);
+        # Seed the database with initial data
+        if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+            hash1 = generate_password_hash("password1")
+            hash2 = generate_password_hash("omgMPC1")
+            db.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("admin", hash1))
+            db.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("bernardo", hash2))
+            db.execute("INSERT INTO notes (assocUser, dateWritten, note, publicID) VALUES (?, ?, ?, ?)", (2, "1993-09-23 10:10:10", "hello my friend", 1234567890))
+            db.execute("INSERT INTO notes (assocUser, dateWritten, note, publicID) VALUES (?, ?, ?, ?)", (2, "1993-09-23 12:10:10", "i want lunch pls", 1234567891))
 
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL
-);
 
-INSERT INTO users VALUES(null,"admin", "{hash1}");
-INSERT INTO users VALUES(null,"bernardo", "{hash2}");
-INSERT INTO notes VALUES(null,2,"1993-09-23 10:10:10","hello my friend",1234567890);
-INSERT INTO notes VALUES(null,2,"1993-09-23 12:10:10","i want lunch pls",1234567891);
-
-""")
-
+# OLD to be deleted once the uses of the DatabaseConnection class is fully implemented
+def connect_db():
+    return sqlite3.connect(app.database)
 
 
 ### APPLICATION SETUP ###

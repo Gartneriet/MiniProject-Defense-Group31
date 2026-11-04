@@ -1,6 +1,6 @@
 import json, sqlite3, click, functools, os, hashlib,time, random, sys
 
-from flask import Flask, current_app, g, session, redirect, render_template, url_for, request, flash
+from flask import Flask, current_app, g, session, redirect, render_template, url_for, request, flash, jsonify
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -68,13 +68,19 @@ def init_db():
 
         # Seed Database with default users and notes if empty
         if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
-            hash1 = generate_password_hash("password1")
-            hash2 = generate_password_hash("omgMPC1")
+            hash1 = generate_password_hash("Mypwisverygoodyes123!")
+            hash2 = generate_password_hash("omgMPC123")
+            hash3 = weak_generate_password_hash("qwerty") # WEAK ON PURPOSE
             db.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("admin", hash1))
             db.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("bernardo", hash2))
+            db.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("disaster", hash3))
             bernardo_id = db.lastrowid
             db.execute("INSERT INTO notes (assocUser, dateWritten, note, publicID) VALUES (?, ?, ?, ?)", (bernardo_id, "1993-09-23 10:10:10", "hello my friend", 1234567890))
             db.execute("INSERT INTO notes (assocUser, dateWritten, note, publicID) VALUES (?, ?, ?, ?)", (bernardo_id, "1993-09-23 12:10:10", "i want lunch pls", 1234567891))
+
+
+def weak_generate_password_hash(password):
+    return generate_password_hash(password, method="pbkdf2:sha256:1000")
 
 
 ### APPLICATION SETUP ###
@@ -161,6 +167,34 @@ def login():
                     return redirect(url_for('index'))
             else:
                 error = "Wrong username or password!"
+
+    return render_template('login.html',error=error)
+
+
+@app.route("/login_vulnerable/", methods=('GET', 'POST'))
+def login_vulnerable():
+    error = ""
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        with DatabaseConnection(app) as db:
+            statement = f"SELECT * FROM users WHERE username = '{username}';" ## VULNERABLE TO SQL INJECTION ON PURPOSE
+            db.execute(statement)
+            result = db.fetchall()
+
+            if len(result) > 0:
+                hashed_password = result[0][2]
+                is_correct = check_password_hash(hashed_password, password)
+                if is_correct:
+                    session.clear()
+                    session['logged_in'] = True
+                    session['userid'] = result[0][0]
+                    session['username']=result[0][1]
+                    return redirect(url_for('index'))
+            else:
+                error = "Wrong username or password!"
+
+            return jsonify({"error": error, "query": statement, "result": result}) # Return the error and the executed query for debugging
 
     return render_template('login.html',error=error)
 

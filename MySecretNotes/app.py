@@ -49,6 +49,11 @@ app = Flask(__name__)
 app.database = "db.sqlite3"
 app.secret_key = os.urandom(32)
 
+#Session and cookie management
+#app.config["SESSION_COOKIE_SECURE"] = True # Only send cookies over HTTPS - however this only makes sense if we have HTTPS
+app.config["SESSION_COOKIE_HTTPONLY"] = True # This doesn't allow JS to access cookies in the browser. This is set to true by default in Flask 3.1.x
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax" # Cookies are sent in same-site contexts and crosssite top-level navigations.
+
 limiter = Limiter(
     get_remote_address,
     app=app,

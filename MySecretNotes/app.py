@@ -81,6 +81,7 @@ def init_db():
 app = Flask(__name__)
 app.database = "db.sqlite3"
 app.secret_key = os.urandom(32)
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 # 16 KB
 
 #Session and cookie management
 #app.config["SESSION_COOKIE_SECURE"] = True # Only send cookies over HTTPS - however this only makes sense if we have HTTPS

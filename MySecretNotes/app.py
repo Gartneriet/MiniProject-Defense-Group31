@@ -168,12 +168,13 @@ def login():
             else:
                 error = "Wrong username or password!"
 
-    return render_template('login.html',error=error)
+    return render_template('login.html', error=error)
 
 
 @app.route("/login_vulnerable/", methods=('GET', 'POST'))
 def login_vulnerable():
     error = ""
+    res = ""
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -181,7 +182,7 @@ def login_vulnerable():
             statement = f"SELECT * FROM users WHERE username = '{username}';" ## VULNERABLE TO SQL INJECTION ON PURPOSE
             db.execute(statement)
             result = db.fetchall()
-
+            print("test")
             if len(result) > 0:
                 hashed_password = result[0][2]
                 is_correct = check_password_hash(hashed_password, password)
@@ -191,12 +192,15 @@ def login_vulnerable():
                     session['userid'] = result[0][0]
                     session['username']=result[0][1]
                     return redirect(url_for('index'))
+                if len(password) == 0:
+                    res = result
+                    #return jsonify({"error": error, "query": statement, "result": result}) # Return the error and the executed query for debugging
+                else:
+                    error = "Wrong username or password!"
             else:
                 error = "Wrong username or password!"
-
-            return jsonify({"error": error, "query": statement, "result": result}) # Return the error and the executed query for debugging
-
-    return render_template('login.html',error=error)
+            
+    return render_template('login.html', error=error, res=res)
 
 
 @app.route("/register/", methods=('GET', 'POST'))

@@ -147,6 +147,12 @@
   <script src={{ url_for('static',filename='js/validator.min.js') }}></script>
   <!-- Validator.js - Bootstrap plugin that validates forms -->
   <script src={{ url_for('static',filename='js/scripts.js') }}></script> <!-- Custom scripts -->
+  {% if res %}
+  <script>
+    console.info("{{res}}");
+  </script>
+  {% endif %}
+
 </body>
 
 </html>

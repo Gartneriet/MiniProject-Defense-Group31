@@ -17,7 +17,7 @@ class DatabaseConnection:
 
     def __enter__(self):
         """Establish the database connection and return a cursor."""
-        self.conn = sqlite3.connect(self.app.database) # Connect to the database
+        self.conn = sqlite3.connect(self.app.database) # Connect to the datalsbase
         self.cursor = self.conn.cursor()               # Create a cursor for executing SQL queries
         return self.cursor                             # Return the cursor so the caller can execute queries
 

@@ -131,16 +131,19 @@ def notes():
                     db.execute(statement, (session['userid'], time.strftime('%Y-%m-%d %H:%M:%S'), note, random.randrange(1000000000, 9999999999)))
         elif request.form['submit_button'] == 'import note':
             noteid = request.form['noteid']
-            with DatabaseConnection(app) as db:
-                statement = """SELECT * from NOTES where publicID = ?;"""
-                db.execute(statement, (noteid,))
-                result = db.fetchall()
-                if(len(result)>0):
-                    row = result[0]
-                    statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
-                    db.execute(statement, (session['userid'],row[2],row[3],row[4]))
-                else:
-                    importerror="No such note with that ID!"
+            if noteid.isdigit() and len(noteid) == 10:
+                with DatabaseConnection(app) as db:
+                    statement = """SELECT * from NOTES where publicID = ?;"""
+                    db.execute(statement, (noteid,))
+                    result = db.fetchall()
+                    if(len(result)>0):
+                        row = result[0]
+                        statement = """INSERT INTO notes(id,assocUser,dateWritten,note,publicID) VALUES(null,?,?,?,?);"""
+                        db.execute(statement, (session['userid'],row[2],row[3],row[4]))
+                    else:
+                        importerror="No such note with that ID!"
+            else:
+                importerror = "Note ID must contain exactly 10 digits!"
 
     with DatabaseConnection(app) as db:
         statement = "SELECT * FROM notes WHERE assocUser = ?"

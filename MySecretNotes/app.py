@@ -123,9 +123,9 @@ def notes():
 
             if not note.strip(): #rejects empty notes
                 noteerror = "Note cannot be empty!"
-            elif len(note) > 300: #reject long notes
+            elif len(note) > 300:  # reject long notes
                 noteerror = "Note cannot be more than 300 characters!"
-            else: #save valid note
+            else:  # save valid note
                 with DatabaseConnection(app) as db:
                     statement = """INSERT INTO notes(assocUser,dateWritten,note,publicID) VALUES(?,?,?,?);"""
                     db.execute(statement, (session['userid'], time.strftime('%Y-%m-%d %H:%M:%S'), note, random.randrange(1000000000, 9999999999)))

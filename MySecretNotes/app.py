@@ -221,6 +221,25 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    response.headers["X-Frame-Options"] = "DENY"
+
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    response.headers["Permissions-Policy"] = (
+        "camera=(), "
+        "microphone=(), "
+        "geolocation=(), "
+        "payment=()"
+    )
+
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+
+    return response
+
 if __name__ == "__main__":
     init_db()
     runport = 5000

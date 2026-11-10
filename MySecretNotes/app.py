@@ -144,7 +144,7 @@ def notes():
     return render_template('notes.html',notes=notes,importerror=importerror)
 
 
-@app.route("/login/", methods=('GET', 'POST'))
+@app.route("/old_login/", methods=('GET', 'POST'))
 @limiter.limit("5 per minute", error_message = "Too many login attempts. Please try again in a minute.")
 def login():
     error = ""
@@ -171,7 +171,7 @@ def login():
     return render_template('login.html', error=error)
 
 
-@app.route("/login_vulnerable/", methods=('GET', 'POST'))
+@app.route("/login/", methods=('GET', 'POST'))
 def login_vulnerable():
     error = ""
     res = ""

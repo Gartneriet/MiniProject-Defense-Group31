@@ -160,34 +160,8 @@ def notes():
     return render_template('notes.html',notes=notes,importerror=importerror, noteerror=noteerror)
 
 
-@app.route("/old_login/", methods=('GET', 'POST'))
-@limiter.limit("5 per minute", error_message = "Too many login attempts. Please try again in a minute.")
-def login():
-    error = ""
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        with DatabaseConnection(app) as db:
-            statement = "SELECT * FROM users WHERE username = ?;"
-            db.execute(statement, (username,))
-            result = db.fetchall()
-
-            if len(result) > 0:
-                hashed_password = result[0][2]
-                is_correct = check_password_hash(hashed_password, password)
-                if is_correct:
-                    session.clear()
-                    session['logged_in'] = True
-                    session['userid'] = result[0][0]
-                    session['username']=result[0][1]
-                    return redirect(url_for('index'))
-            else:
-                error = "Wrong username or password!"
-
-    return render_template('login.html', error=error)
-
-
 @app.route("/login/", methods=('GET', 'POST'))
+@limiter.limit("5 per minute", error_message = "Too many login attempts. Please try again in a minute.")
 def login_vulnerable():
     error = ""
     res = ""
